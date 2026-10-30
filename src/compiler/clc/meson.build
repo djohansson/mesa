@@ -21,6 +21,13 @@ if not _shared_llvm or \
     clang_version_dir = dep_llvm.version().split('.')[0]
   endif
   clang_resource_dir = join_paths(llvm_libdir, 'clang', clang_version_dir, 'include')
+  if not fs.is_dir(clang_resource_dir)
+    # vcpkg's LLVM keeps clang's resources beside its tools, apart from its
+    # libraries
+    clang_resource_dir = join_paths(
+      dep_llvm.get_variable(cmake : 'LLVM_TOOLS_BINARY_DIR', configtool : 'bindir'),
+      'lib', 'clang', clang_version_dir, 'include')
+  endif
 
   opencl_c_base_h = custom_target(
     'opencl-c-base.h',
