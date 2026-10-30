@@ -65,7 +65,9 @@ mtl_new_buffer_with_length(mtl_heap *heap, uint64_t size_B, uint64_t offset_B)
 {
    @autoreleasepool {
       id<MTLHeap> hp = (id<MTLHeap>)heap;
-      return (mtl_buffer *)[hp newBufferWithLength:size_B options:KK_MTL_RESOURCE_OPTIONS offset:offset_B];
+      return (mtl_buffer *)[hp newBufferWithLength:size_B
+                                           options:hp.resourceOptions
+                                            offset:offset_B];
    }
 }
 

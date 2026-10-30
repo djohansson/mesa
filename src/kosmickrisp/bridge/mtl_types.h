@@ -47,6 +47,7 @@ typedef void mtl_argument_table_descriptor;
 typedef void mtl_argument_table;
 typedef void mtl_commit_options;
 typedef void mtl_counter_heap;
+typedef void mtl_acceleration_structure;
 
 struct mtl_feedback_data;
 typedef void (*mtl_feedback_handler_callback)(struct mtl_feedback_data *data);
@@ -179,6 +180,25 @@ enum mtl_texture_swizzle {
 enum mtl_index_type {
    MTL_INDEX_TYPE_UINT16 = 0,
    MTL_INDEX_TYPE_UINT32 = 1,
+};
+
+enum mtl_attribute_format {
+   MTL_ATTRIBUTE_FORMAT_INVALID = 0,
+   MTL_ATTRIBUTE_FORMAT_SHORT2_NORMALIZED = 22,
+   MTL_ATTRIBUTE_FORMAT_SHORT4_NORMALIZED = 24,
+   MTL_ATTRIBUTE_FORMAT_HALF2 = 25,
+   MTL_ATTRIBUTE_FORMAT_HALF4 = 27,
+   MTL_ATTRIBUTE_FORMAT_FLOAT2 = 29,
+   MTL_ATTRIBUTE_FORMAT_FLOAT3 = 30,
+};
+
+enum mtl_acceleration_structure_usage {
+   MTL_ACCELERATION_STRUCTURE_USAGE_NONE = 0,
+   MTL_ACCELERATION_STRUCTURE_USAGE_REFIT = 1 << 0,
+   MTL_ACCELERATION_STRUCTURE_USAGE_PREFER_FAST_BUILD = 1 << 1,
+   MTL_ACCELERATION_STRUCTURE_USAGE_EXTENDED_LIMITS = 1 << 2,
+   MTL_ACCELERATION_STRUCTURE_USAGE_PREFER_FAST_INTERSECTION = 1 << 4,
+   MTL_ACCELERATION_STRUCTURE_USAGE_MINIMIZE_MEMORY = 1 << 5,
 };
 
 enum mtl_sampler_address_mode {
