@@ -2131,7 +2131,17 @@ if with_clc
 
     dep_clang = []
     foreach m : clang_modules
-      dep_clang += cpp.find_library(m, dirs : llvm_libdir, required : true)
+      _dep_clang_module = cpp.find_library(m, dirs : llvm_libdir, required : false)
+      _clang_module_archive = join_paths(llvm_libdir, 'lib' + m + '.a')
+      if not _dep_clang_module.found() and fs.is_file(_clang_module_archive)
+        # An archive of LLVM bitcode (an LLVM built with LTO, as vcpkg's can be)
+        # has no architecture that meson's check on macOS can see, which rejects
+        # it: link it by its path
+        _dep_clang_module = declare_dependency(link_args : _clang_module_archive)
+      elif not _dep_clang_module.found()
+        error('C++ library \'' + m + '\' not found')
+      endif
+      dep_clang += _dep_clang_module
     endforeach
   endif
 endif
