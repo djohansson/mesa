@@ -37,6 +37,13 @@ struct kk_ptr {
 VkResult kk_alloc_bo(struct kk_device *dev, struct vk_object_base *log_obj,
                      uint64_t size_B, uint64_t align_B, struct kk_bo **bo_out);
 
+/* In a heap of those resource options: a private one has no CPU address */
+VkResult kk_alloc_bo_with_options(struct kk_device *dev,
+                                  struct vk_object_base *log_obj,
+                                  uint64_t size_B, uint64_t align_B,
+                                  enum mtl_resource_options resource_options,
+                                  struct kk_bo **bo_out);
+
 void kk_destroy_bo(struct kk_device *dev, struct kk_bo *bo);
 
 VkResult kk_bo_map_placed(struct kk_device *dev, struct kk_bo *bo, void **addr);

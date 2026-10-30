@@ -71,6 +71,13 @@ struct kk_physical_device {
    uint8_t mem_heap_count;
    uint8_t mem_type_count;
 
+   /* The memory types of shared heaps, which everything but acceleration
+    * structures takes, and the one of private heaps (UINT8_MAX for none),
+    * which only acceleration structures' buffers take: Metal places
+    * acceleration structures in private heaps only */
+   uint32_t shared_mem_types;
+   uint8_t private_mem_type;
+
    // Emulated binary sync type
    struct vk_sync_binary_type sync_binary_type;
    const struct vk_sync_type *sync_types[3];

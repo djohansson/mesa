@@ -481,9 +481,11 @@ kk_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
       /* We chain encoders, so an intra-encoder barrier is enough here:
        * no need to tear down and recreate the encoder.
        */
-      mtl_barrier_after_encoder_stages(cmd->metal.compute,
-                                       MTL_STAGE_DISPATCH | MTL_STAGE_BLIT,
-                                       MTL_STAGE_DISPATCH | MTL_STAGE_BLIT);
+      mtl_barrier_after_encoder_stages(
+         cmd->metal.compute,
+         MTL_STAGE_DISPATCH | MTL_STAGE_BLIT | MTL_STAGE_ACCELERATION_STRUCTURE,
+         MTL_STAGE_DISPATCH | MTL_STAGE_BLIT |
+            MTL_STAGE_ACCELERATION_STRUCTURE);
    }
 }
 

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 libkk_shader_files = files(
+  'kk_acceleration_structure.cl',
   'kk_draws.cl',
   'kk_geometry.cl',
   'kk_query.cl',

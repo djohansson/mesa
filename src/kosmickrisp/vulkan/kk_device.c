@@ -331,6 +331,20 @@ kk_CreateDevice(VkPhysicalDevice physicalDevice,
    if (result != VK_SUCCESS)
       goto fail_sampler_heap;
 
+   if (dev->vk.enabled_extensions.KHR_acceleration_structure) {
+      dev->empty_acceleration_structure =
+         mtl_new_empty_acceleration_structure(dev->mtl_handle);
+      if (dev->empty_acceleration_structure == NULL) {
+         result = vk_error(dev, VK_ERROR_INITIALIZATION_FAILED);
+         goto fail_lib;
+      }
+      dev->empty_acceleration_structure_id =
+         mtl_acceleration_structure_get_gpu_resource_id(
+            dev->empty_acceleration_structure);
+      kk_device_add_allocation_to_residency_set(
+         dev, dev->empty_acceleration_structure);
+   }
+
    if (pdev->settings.gpu_capture_enabled) {
       const char *capture_directory =
          debug_get_option("MESA_KK_GPU_CAPTURE_DIRECTORY", NULL);
@@ -341,6 +355,8 @@ kk_CreateDevice(VkPhysicalDevice physicalDevice,
 
    return VK_SUCCESS;
 
+fail_lib:
+   kk_device_finish_lib(dev);
 fail_sampler_heap:
    kk_destroy_sampler_heap(dev, &dev->samplers);
 fail_query_table:
@@ -388,6 +404,12 @@ kk_DestroyDevice(VkDevice _device, const VkAllocationCallbacks *pAllocator)
    /* Geometry heap */
    if (dev->heap)
       kk_destroy_bo(dev, dev->heap);
+
+   if (dev->empty_acceleration_structure) {
+      kk_device_remove_allocation_from_residency_set(
+         dev, dev->empty_acceleration_structure);
+      mtl_release(dev->empty_acceleration_structure);
+   }
 
    if (dev->has_queue) {
       kk_queue_finish(dev, &dev->queue);
@@ -456,6 +478,24 @@ kk_device_remove_buffer_from_residency_set(struct kk_device *dev,
 {
    simple_mtx_lock(&dev->residency_set.mutex);
    mtl_residency_set_remove_allocation(dev->residency_set.handle, buffer);
+   simple_mtx_unlock(&dev->residency_set.mutex);
+}
+
+void
+kk_device_add_allocation_to_residency_set(struct kk_device *dev,
+                                          mtl_allocation *allocation)
+{
+   simple_mtx_lock(&dev->residency_set.mutex);
+   mtl_residency_set_add_allocation(dev->residency_set.handle, allocation);
+   simple_mtx_unlock(&dev->residency_set.mutex);
+}
+
+void
+kk_device_remove_allocation_from_residency_set(struct kk_device *dev,
+                                               mtl_allocation *allocation)
+{
+   simple_mtx_lock(&dev->residency_set.mutex);
+   mtl_residency_set_remove_allocation(dev->residency_set.handle, allocation);
    simple_mtx_unlock(&dev->residency_set.mutex);
 }
 

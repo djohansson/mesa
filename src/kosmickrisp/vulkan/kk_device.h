@@ -103,6 +103,12 @@ struct kk_device {
    /* Geomtry heap */
    struct kk_bo *heap;
    util_once_flag heap_init_once;
+
+   /* What Vulkan's inactive instances reference in Metal (see
+    * libkk_convert_acceleration_structure_instances): a bottom level
+    * acceleration structure of nothing, with acceleration structures */
+   mtl_acceleration_structure *empty_acceleration_structure;
+   uint64_t empty_acceleration_structure_id;
 };
 
 VK_DEFINE_HANDLE_CASTS(kk_device, vk.base, VkDevice, VK_OBJECT_TYPE_DEVICE)
@@ -124,6 +130,10 @@ void kk_device_add_buffer_to_residency_set(struct kk_device *dev,
                                            mtl_buffer *buffer);
 void kk_device_remove_buffer_from_residency_set(struct kk_device *dev,
                                                 mtl_buffer *buffer);
+void kk_device_add_allocation_to_residency_set(struct kk_device *dev,
+                                               mtl_allocation *allocation);
+void kk_device_remove_allocation_from_residency_set(struct kk_device *dev,
+                                                    mtl_allocation *allocation);
 void kk_device_make_resources_resident(struct kk_device *dev);
 
 /* Required to create a sampler */

@@ -23,6 +23,11 @@ struct kk_buffer {
       /* Offset within handle's base address. Don't use this directly, route all
        * offset calculations through kk_buffer_mtl_offset */
       uint64_t offset;
+      /* The heap of the memory it is bound to and its offset there, which
+       * acceleration structures are placed by. NULL where the memory has no
+       * heap (imported from the host) */
+      mtl_heap *heap;
+      uint64_t heap_offset;
    } metal;
 };
 

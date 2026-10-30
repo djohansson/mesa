@@ -41,6 +41,14 @@ struct kk_storage_image_descriptor {
 static_assert(sizeof(struct kk_storage_image_descriptor) == 8,
               "kk_storage_image_descriptor has no holes");
 
+/* An acceleration structure's Metal resource id, as the shaders take it */
+struct kk_acceleration_structure_descriptor {
+   uint64_t gpu_resource_id;
+};
+
+static_assert(sizeof(struct kk_acceleration_structure_descriptor) == 8,
+              "kk_acceleration_structure_descriptor has no holes");
+
 /* This has to match nir_address_format_64bit_bounded_global */
 struct kk_buffer_address {
    uint64_t base_addr;

@@ -56,8 +56,7 @@ kk_GetMemoryMetalHandlePropertiesEXT(
    default:
       return vk_error(dev, VK_ERROR_INVALID_EXTERNAL_HANDLE);
    }
-   pMemoryMetalHandleProperties->memoryTypeBits =
-      BITFIELD_MASK(pdev->mem_type_count);
+   pMemoryMetalHandleProperties->memoryTypeBits = pdev->shared_mem_types;
 
    return VK_SUCCESS;
 }
@@ -79,8 +78,7 @@ kk_GetMemoryHostPointerPropertiesEXT(
    default:
       return vk_error(dev, VK_ERROR_INVALID_EXTERNAL_HANDLE);
    }
-   pMemoryHostPointerProperties->memoryTypeBits =
-      BITFIELD_MASK(pdev->mem_type_count);
+   pMemoryHostPointerProperties->memoryTypeBits = pdev->shared_mem_types;
 
    return VK_SUCCESS;
 }
@@ -141,8 +139,14 @@ kk_AllocateMemory(VkDevice device, const VkMemoryAllocateInfo *pAllocateInfo,
       mem->bo->gpu = mtl_buffer_get_gpu_address(mem->bo->map);
       mem->bo->cpu = mtl_get_contents(mem->bo->map);
    } else {
+      /* Acceleration structures' memory (see kk_physical_device) */
+      const bool private_heap = pAllocateInfo->memoryTypeIndex ==
+                                kk_device_physical(dev)->private_mem_type;
       result =
-         kk_alloc_bo(dev, &dev->vk.base, aligned_size, alignment, &mem->bo);
+         kk_alloc_bo_with_options(dev, &dev->vk.base, aligned_size, alignment,
+                                  private_heap ? KK_MTL_PRIVATE_RESOURCE_OPTIONS
+                                               : KK_MTL_RESOURCE_OPTIONS,
+                                  &mem->bo);
       if (result != VK_SUCCESS)
          goto fail_alloc;
    }

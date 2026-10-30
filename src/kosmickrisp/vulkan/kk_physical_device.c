@@ -142,6 +142,7 @@ kk_get_device_extensions(const struct kk_instance *instance,
       .EXT_vertex_attribute_divisor = true,
 
       /* Optional extensions */
+      .KHR_acceleration_structure = KK_EXPERIMENTAL(RAY_QUERY),
       .KHR_calibrated_timestamps = true,
       .KHR_deferred_host_operations = true,
       .KHR_maintenance7 = true,
@@ -154,6 +155,7 @@ kk_get_device_extensions(const struct kk_instance *instance,
       .KHR_present_wait = true,
       .KHR_present_wait2 = true,
 #endif
+      .KHR_ray_query = KK_EXPERIMENTAL(RAY_QUERY),
       .KHR_robustness2 = true,
       .KHR_shader_fma = true,
       .KHR_shader_maximal_reconvergence = true,
@@ -361,6 +363,11 @@ kk_get_device_features(
       .vertexAttributeInstanceRateDivisor = true,
       .vertexAttributeInstanceRateZeroDivisor = true,
 
+      /* VK_KHR_acceleration_structure */
+      .accelerationStructure = KK_EXPERIMENTAL(RAY_QUERY),
+      .descriptorBindingAccelerationStructureUpdateAfterBind =
+         KK_EXPERIMENTAL(RAY_QUERY),
+
       /* VK_EXT_mutable_descriptor_type */
       .mutableDescriptorType = true,
 
@@ -389,6 +396,9 @@ kk_get_device_features(
       /* VK_KHR_present_wait2 */
       .presentWait2 = true,
 #endif
+
+      /* VK_KHR_ray_query */
+      .rayQuery = KK_EXPERIMENTAL(RAY_QUERY),
 
       /* VK_KHR_robustness2 */
       .robustBufferAccess2 = true,
@@ -776,6 +786,19 @@ kk_get_device_properties(
 
       /* VK_KHR_push_descriptor */
       .maxPushDescriptors = KK_MAX_PUSH_DESCRIPTORS,
+
+      /* VK_KHR_acceleration_structure: Metal's limits without its extended
+       * ones (2^28 primitives, short of Vulkan's 2^29) */
+      .maxGeometryCount = (1u << 24) - 1u,
+      .maxInstanceCount = (1u << 24) - 1u,
+      .maxPrimitiveCount = (1u << 28) - 1u,
+      .maxPerStageDescriptorAccelerationStructures = KK_MAX_DESCRIPTORS,
+      .maxPerStageDescriptorUpdateAfterBindAccelerationStructures =
+         KK_MAX_DESCRIPTORS,
+      .maxDescriptorSetAccelerationStructures = KK_MAX_DESCRIPTORS,
+      .maxDescriptorSetUpdateAfterBindAccelerationStructures =
+         KK_MAX_DESCRIPTORS,
+      .minAccelerationStructureScratchOffsetAlignment = 256u,
 
       /* VK_EXT_blend_operation_advanced */
       .advancedBlendMaxColorAttachments = KK_MAX_RTS,
@@ -1199,6 +1222,16 @@ kk_enumerate_physical_devices(struct vk_instance *_instance)
                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
       .heapIndex = sysmem_heap_idx,
    };
+   pdev->shared_mem_types = BITFIELD_MASK(pdev->mem_type_count);
+
+   pdev->private_mem_type = UINT8_MAX;
+   if (supported_extensions.KHR_acceleration_structure) {
+      pdev->private_mem_type = pdev->mem_type_count;
+      pdev->mem_types[pdev->mem_type_count++] = (VkMemoryType){
+         .propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+         .heapIndex = sysmem_heap_idx,
+      };
+   }
 
    assert(pdev->mem_heap_count <= ARRAY_SIZE(pdev->mem_heaps));
    assert(pdev->mem_type_count <= ARRAY_SIZE(pdev->mem_types));

@@ -26,6 +26,8 @@ enum kk_experimental {
    /* Using allowGPUOptimizedContents on M5 for this format causes
     * vkCmdCopyImage() tests in CTS to fail, but it is otherwise usable */
    KK_EXPERIMENTAL_M5_OPTIMIZE_E5B9G9R9 = 1ull << 2,
+   /* Advertise ray queries (VK_KHR_acceleration_structure, VK_KHR_ray_query) */
+   KK_EXPERIMENTAL_RAY_QUERY = 1ull << 3,
 };
 
 extern enum kk_experimental kk_mesa_experimental_flags;

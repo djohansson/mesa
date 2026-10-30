@@ -43,4 +43,10 @@ VK_DEFINE_NONDISP_HANDLE_CASTS(kk_query_pool, vk.base, VkQueryPool,
 
 uint16_t *kk_pool_index_ptr(const struct kk_query_pool *pool);
 
+struct kk_device;
+
+/* The GPU address of a query's first report */
+uint64_t kk_query_report_address(struct kk_device *dev,
+                                 struct kk_query_pool *pool, uint32_t query);
+
 #endif /* KK_QUERY_POOL_H */

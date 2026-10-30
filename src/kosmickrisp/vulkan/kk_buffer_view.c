@@ -49,6 +49,24 @@ kk_get_buffer_format_features(struct kk_physical_device *pdev,
    if (kk_vbo_supports_format(p_format))
       features |= VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT;
 
+   /* What Metal builds acceleration structures of (see
+    * kk_acceleration_structure_vertex_format) */
+   if (pdev->vk.supported_extensions.KHR_acceleration_structure) {
+      switch (vk_format) {
+      case VK_FORMAT_R32G32B32_SFLOAT:
+      case VK_FORMAT_R32G32_SFLOAT:
+      case VK_FORMAT_R16G16B16A16_SFLOAT:
+      case VK_FORMAT_R16G16_SFLOAT:
+      case VK_FORMAT_R16G16B16A16_SNORM:
+      case VK_FORMAT_R16G16_SNORM:
+         features |=
+            VK_FORMAT_FEATURE_2_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR;
+         break;
+      default:
+         break;
+      }
+   }
+
    return features;
 }
 

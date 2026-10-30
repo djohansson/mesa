@@ -37,6 +37,7 @@ kk_reports_per_query(struct kk_query_pool *pool)
    switch (pool->vk.query_type) {
    case VK_QUERY_TYPE_OCCLUSION:
    case VK_QUERY_TYPE_TIMESTAMP:
+   case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR:
       return 1;
    default:
       UNREACHABLE("Unsupported query type");
@@ -69,6 +70,17 @@ kk_pool_is_ts(struct kk_query_pool *pool)
    return pool->vk.query_type == VK_QUERY_TYPE_TIMESTAMP;
 }
 
+/* Timestamp and acceleration structure property pools carry availability in
+ * the report itself (LIBKK_QUERY_UNAVAILABLE until written), so they need no
+ * availability array, and index their reports by query. */
+static inline bool
+kk_pool_has_inline_availability(struct kk_query_pool *pool)
+{
+   return kk_pool_is_ts(pool) ||
+          pool->vk.query_type ==
+             VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+}
+
 static uint64_t
 kk_query_report_addr(struct kk_device *dev, struct kk_query_pool *pool,
                      uint32_t query)
@@ -76,9 +88,17 @@ kk_query_report_addr(struct kk_device *dev, struct kk_query_pool *pool,
    struct kk_bo *bo =
       kk_pool_is_oq(pool) ? dev->occlusion_queries.bo : pool->bo;
 
-   uint32_t index =
-      kk_pool_is_ts(pool) ? query : kk_pool_index_ptr(pool)[query];
+   uint32_t index = kk_pool_has_inline_availability(pool)
+                       ? query
+                       : kk_pool_index_ptr(pool)[query];
    return bo->gpu + pool->query_start + (index * sizeof(uint64_t));
+}
+
+uint64_t
+kk_query_report_address(struct kk_device *dev, struct kk_query_pool *pool,
+                        uint32_t query)
+{
+   return kk_query_report_addr(dev, pool, query);
 }
 
 static uint64_t
@@ -96,8 +116,9 @@ kk_query_report_map(struct kk_device *dev, struct kk_query_pool *pool,
       kk_pool_is_oq(pool) ? dev->occlusion_queries.bo : pool->bo;
 
    uint64_t *queries = (uint64_t *)(bo->cpu + pool->query_start);
-   uint32_t index =
-      kk_pool_is_ts(pool) ? query : kk_pool_index_ptr(pool)[query];
+   uint32_t index = kk_pool_has_inline_availability(pool)
+                       ? query
+                       : kk_pool_index_ptr(pool)[query];
 
    return (struct kk_query_report *)&queries[index];
 }
@@ -114,7 +135,7 @@ host_zero_queries(struct kk_device *dev, struct kk_query_pool *pool,
       /* Timestamp pools have no availability word: an unavailable query is
        * the sentinel sitting in the report, which the resolve overwrites. */
       uint64_t value = 0;
-      if (kk_pool_is_ts(pool)) {
+      if (kk_pool_has_inline_availability(pool)) {
          value = set_available ? 0 : LIBKK_QUERY_UNAVAILABLE;
       } else {
          uint32_t *available = kk_query_available_map(pool, first_index + i);
@@ -150,7 +171,7 @@ kk_CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo *pCreateInfo,
     * availability array. */
    uint32_t availability_size = 0;
    uint32_t index_size = 0;
-   if (!kk_pool_is_ts(pool)) {
+   if (!kk_pool_has_inline_availability(pool)) {
       availability_size = pool->vk.query_count * sizeof(uint32_t);
       index_size = sizeof(uint16_t) * pool->vk.query_count;
    }
@@ -259,9 +280,12 @@ emit_zero_queries(struct kk_cmd_buffer *cmd, struct kk_query_pool *pool,
       kk_pool_is_oq(pool) ? dev->occlusion_queries.bo : pool->bo;
 
    struct libkk_reset_query_args info = {
-      .availability = kk_pool_is_ts(pool) ? 0u : pool->bo->gpu,
+      .availability =
+         kk_pool_has_inline_availability(pool) ? 0u : pool->bo->gpu,
       .results = results_bo->gpu + pool->query_start,
-      .oq_index = kk_pool_is_ts(pool) ? 0u : pool->bo->gpu + pool->index_start,
+      .oq_index = kk_pool_has_inline_availability(pool)
+                     ? 0u
+                     : pool->bo->gpu + pool->index_start,
 
       .first_query = first_index,
       .reports_per_query = kk_reports_per_query(pool),
@@ -460,7 +484,7 @@ static bool
 kk_query_is_available(struct kk_device *dev, struct kk_query_pool *pool,
                       uint32_t query)
 {
-   if (kk_pool_is_ts(pool)) {
+   if (kk_pool_has_inline_availability(pool)) {
       /* The resolve of the sampled value is what makes the query available. */
       const struct kk_query_report *report =
          kk_query_report_map(dev, pool, query);
@@ -579,9 +603,12 @@ kk_CmdCopyQueryPoolResultsToMemoryKHR(
       kk_pool_is_oq(pool) ? dev->occlusion_queries.bo : pool->bo;
 
    struct libkk_copy_queries_args args = {
-      .availability = kk_pool_is_ts(pool) ? 0u : pool->bo->gpu,
+      .availability =
+         kk_pool_has_inline_availability(pool) ? 0u : pool->bo->gpu,
       .results = results_bo->gpu + pool->query_start,
-      .oq_index = kk_pool_is_ts(pool) ? 0u : pool->bo->gpu + pool->index_start,
+      .oq_index = kk_pool_has_inline_availability(pool)
+                     ? 0u
+                     : pool->bo->gpu + pool->index_start,
       .dst_addr = pDstRange->address,
       .dst_stride = pDstRange->stride,
       .first_query = firstQuery,

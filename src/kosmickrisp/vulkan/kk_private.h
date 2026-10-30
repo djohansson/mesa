@@ -49,6 +49,10 @@
       MTL_RESOURCE_CPU_CACHE_MODE_DEFAULT_CACHE |                              \
       MTL_RESOURCE_TRACKING_MODE_UNTRACKED
 
+/* Memory only the GPU accesses: acceleration structures' */
+#define KK_MTL_PRIVATE_RESOURCE_OPTIONS                                        \
+   MTL_RESOURCE_STORAGE_MODE_PRIVATE | MTL_RESOURCE_TRACKING_MODE_UNTRACKED
+
 struct kk_addr_range {
    uint64_t addr;
    uint64_t range;

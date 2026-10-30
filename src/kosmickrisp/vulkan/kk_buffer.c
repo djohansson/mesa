@@ -22,6 +22,17 @@ kk_get_buffer_alignment(const struct kk_physical_device *pdev, uint64_t size,
    mtl_heap_buffer_size_and_align_with_length(pdev->mtl_dev_handle, &size,
                                               &alignment);
 
+   /* An acceleration structure is placed in its buffer's heap at a multiple of
+    * Metal's alignment for them: aligned so, one at the buffer's start needs
+    * no padding (see kk_acceleration_structure_vk_size) */
+   if (usage_flags & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
+      uint64_t as_size = 1u;
+      uint64_t as_alignment = 1u;
+      mtl_heap_acceleration_structure_size_and_align(pdev->mtl_dev_handle,
+                                                     &as_size, &as_alignment);
+      alignment = MAX2(alignment, as_alignment);
+   }
+
    /** TODO_KOSMICKRISP Metal requires that texel buffers be aligned to the
     * format they'll use. Since we won't be able to know the format until the
     * view is created, we should align to the worst case scenario. For this, we
@@ -82,7 +93,14 @@ kk_GetDeviceBufferMemoryRequirements(
    pMemoryRequirements->memoryRequirements = (VkMemoryRequirements){
       .size = align64(pInfo->pCreateInfo->size, alignment),
       .alignment = alignment,
-      .memoryTypeBits = BITFIELD_MASK(pdev->mem_type_count),
+      /* Only acceleration structures are placed in private heaps, and they
+       * only there */
+      .memoryTypeBits =
+         (pInfo->pCreateInfo->usage &
+          VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) &&
+               pdev->private_mem_type != UINT8_MAX
+            ? BITFIELD_BIT(pdev->private_mem_type)
+            : pdev->shared_mem_types,
    };
 
    vk_foreach_struct(sType, ext, pMemoryRequirements->pNext) {
@@ -159,6 +177,8 @@ kk_bind_buffer_memory(struct kk_device *dev, const VkBindBufferMemoryInfo *info)
       buffer->metal.handle = mtl_new_buffer_with_length(
          mem->bo->mtl_handle, buffer->vk.size, info->memoryOffset);
       buffer->metal.offset = 0u;
+      buffer->metal.heap = mem->bo->mtl_handle;
+      buffer->metal.heap_offset = info->memoryOffset;
    } else {
       /* If the memory is not heap backed, for example if we imported a host
        * pointer, use the mapped buffer directly and retain a reference */
@@ -173,8 +193,9 @@ kk_bind_buffer_memory(struct kk_device *dev, const VkBindBufferMemoryInfo *info)
    buffer->vk.device_address =
       mtl_buffer_get_gpu_address(buffer->metal.handle) + buffer->metal.offset;
    /* We need Metal to give us a CPU mapping so it correctly captures the
-    * data in the GPU debugger... */
-   mtl_get_contents(buffer->metal.handle);
+    * data in the GPU debugger... (private memory has none) */
+   if (mem->bo->cpu)
+      mtl_get_contents(buffer->metal.handle);
 
    return VK_SUCCESS;
 }
