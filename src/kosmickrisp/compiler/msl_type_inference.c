@@ -271,10 +271,57 @@ infer_types_from_alu(struct hash_table *types, nir_alu_instr *alu)
    }
 }
 
+static ti_type
+ray_query_value_type(nir_ray_query_value value)
+{
+   switch (value) {
+   case nir_ray_query_value_intersection_type:
+   case nir_ray_query_value_intersection_instance_custom_index:
+   case nir_ray_query_value_intersection_instance_id:
+   case nir_ray_query_value_intersection_instance_sbt_index:
+   case nir_ray_query_value_intersection_geometry_index:
+   case nir_ray_query_value_intersection_primitive_index:
+   case nir_ray_query_value_flags:
+      return TYPE_UINT;
+   case nir_ray_query_value_intersection_front_face:
+   case nir_ray_query_value_intersection_candidate_aabb_opaque:
+      return TYPE_BOOL;
+   default:
+      return TYPE_FLOAT;
+   }
+}
+
 static void
 infer_types_from_intrinsic(struct hash_table *types, nir_intrinsic_instr *instr)
 {
    switch (instr->intrinsic) {
+   case nir_intrinsic_rq_initialize:
+      set_type(types, &instr->src[0], TYPE_UINT);
+      set_type(types, &instr->src[1], TYPE_UINT); // acceleration structure
+      set_type(types, &instr->src[2], TYPE_UINT); // flags
+      set_type(types, &instr->src[3], TYPE_UINT); // cull mask
+      set_type(types, &instr->src[4], TYPE_FLOAT);
+      set_type(types, &instr->src[5], TYPE_FLOAT);
+      set_type(types, &instr->src[6], TYPE_FLOAT);
+      set_type(types, &instr->src[7], TYPE_FLOAT);
+      break;
+   case nir_intrinsic_rq_terminate:
+   case nir_intrinsic_rq_confirm_intersection:
+      set_type(types, &instr->src[0], TYPE_UINT);
+      break;
+   case nir_intrinsic_rq_generate_intersection:
+      set_type(types, &instr->src[0], TYPE_UINT);
+      set_type(types, &instr->src[1], TYPE_FLOAT);
+      break;
+   case nir_intrinsic_rq_proceed:
+      set_type(types, &instr->src[0], TYPE_UINT);
+      set_type(types, &instr->def, TYPE_BOOL);
+      break;
+   case nir_intrinsic_rq_load:
+      set_type(types, &instr->src[0], TYPE_UINT);
+      set_type(types, &instr->def,
+               ray_query_value_type(nir_intrinsic_ray_query_value(instr)));
+      break;
    case nir_intrinsic_load_input:
    case nir_intrinsic_load_interpolated_input:
    case nir_intrinsic_load_output: {

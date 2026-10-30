@@ -209,6 +209,7 @@ is_idx_intrin(nir_intrinsic_instr *intrin)
 
 static nir_def *
 load_descriptor_for_idx_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
+                               unsigned num_components, unsigned bit_size,
                                const struct lower_descriptors_ctx *ctx)
 {
    nir_def *index = nir_imm_int(b, 0);
@@ -223,7 +224,8 @@ load_descriptor_for_idx_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
    uint32_t binding = nir_intrinsic_binding(intrin);
    index = nir_iadd(b, index, intrin->src[0].ssa);
 
-   return load_descriptor(b, 4, 32, set, binding, index, 0, ctx);
+   return load_descriptor(b, num_components, bit_size, set, binding, index, 0,
+                          ctx);
 }
 
 static bool
@@ -240,7 +242,10 @@ try_lower_load_vulkan_descriptor(nir_builder *b, nir_intrinsic_instr *intrin,
       return false;
    }
 
-   nir_def *desc = load_descriptor_for_idx_intrin(b, idx_intrin, ctx);
+   /* A buffer's descriptor is its address and size (4x32), an acceleration
+    * structure's its Metal resource id (1x64) */
+   nir_def *desc = load_descriptor_for_idx_intrin(
+      b, idx_intrin, intrin->def.num_components, intrin->def.bit_size, ctx);
 
    nir_def_rewrite_uses(&intrin->def, desc);
 

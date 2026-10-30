@@ -97,6 +97,7 @@ bool msl_nir_lower_multisample_alpha(nir_shader *s, bool alpha_to_coverage,
                                      bool alpha_to_one);
 
 bool msl_gather_uses_per_draw_data(nir_shader *nir);
+bool msl_nir_lower_ray_query_vars(nir_shader *nir);
 
 static const nir_shader_compiler_options kk_nir_options = {
    .lower_fdph = true,

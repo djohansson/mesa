@@ -9,6 +9,9 @@
 #include "nir.h"
 #include "nir_builder.h"
 #include "nir_builtin_builder.h"
+#include "nir_deref.h"
+
+#include "util/hash_table.h"
 
 #include "util/format/u_format.h"
 
@@ -990,5 +993,95 @@ msl_nir_lower_multisample_alpha(nir_shader *s, bool alpha_to_coverage,
    if (alpha_to_one)
       NIR_PASS(progress, s, nir_lower_alpha_to_one);
 
+   return progress;
+}
+
+static bool
+is_ray_query_intrinsic(nir_intrinsic_op op)
+{
+   switch (op) {
+   case nir_intrinsic_rq_initialize:
+   case nir_intrinsic_rq_terminate:
+   case nir_intrinsic_rq_proceed:
+   case nir_intrinsic_rq_generate_intersection:
+   case nir_intrinsic_rq_confirm_intersection:
+   case nir_intrinsic_rq_load:
+      return true;
+   default:
+      return false;
+   }
+}
+
+static uint32_t
+ray_query_count(const struct glsl_type *type)
+{
+   return glsl_type_is_array(type) ? glsl_get_aoa_size(type) : 1u;
+}
+
+/* Metal's intersection queries are objects declared in the function rather
+ * than variables in memory, so every ray query variable (and element of a ray
+ * query array) becomes a numbered query, rqN in the generated source: the
+ * ray query intrinsics' deref source is replaced by the query's number, and
+ * the variables go. Must run once functions are inlined, before variables are
+ * split or lowered. Only constant array indices are supported. */
+bool
+msl_nir_lower_ray_query_vars(nir_shader *nir)
+{
+   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+   struct hash_table *bases = _mesa_pointer_hash_table_create(NULL);
+   uint32_t count = 0u;
+   bool progress = false;
+
+   nir_builder b = nir_builder_create(impl);
+   nir_foreach_block(block, impl) {
+      nir_foreach_instr(instr, block) {
+         if (instr->type != nir_instr_type_intrinsic)
+            continue;
+         nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+         if (!is_ray_query_intrinsic(intr->intrinsic))
+            continue;
+
+         nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
+         assert(deref != NULL);
+
+         nir_deref_path path;
+         nir_deref_path_init(&path, deref, NULL);
+         assert(path.path[0]->deref_type == nir_deref_type_var);
+         nir_variable *var = path.path[0]->var;
+
+         uint32_t index = 0u;
+         for (unsigned i = 1u; path.path[i]; ++i) {
+            nir_deref_instr *d = path.path[i];
+            if (d->deref_type != nir_deref_type_array ||
+                !nir_src_is_const(d->arr.index))
+               UNREACHABLE("ray queries indexed dynamically are unsupported");
+            index += nir_src_as_uint(d->arr.index) * ray_query_count(d->type);
+         }
+         nir_deref_path_finish(&path);
+
+         struct hash_entry *entry = _mesa_hash_table_search(bases, var);
+         if (entry == NULL) {
+            entry =
+               _mesa_hash_table_insert(bases, var, (void *)(uintptr_t)count);
+            count += ray_query_count(var->type);
+         }
+         uint32_t base = (uint32_t)(uintptr_t)entry->data;
+
+         b.cursor = nir_before_instr(instr);
+         nir_src_rewrite(&intr->src[0], nir_imm_int(&b, base + index));
+         progress = true;
+      }
+   }
+
+   _mesa_hash_table_destroy(bases, NULL);
+
+   if (progress) {
+      nir_progress(true, impl, nir_metadata_control_flow);
+      NIR_PASS(_, nir, nir_opt_dce);
+      NIR_PASS(_, nir, nir_remove_dead_variables,
+               nir_var_function_temp | nir_var_shader_temp, NULL);
+   } else {
+      nir_progress(false, impl, nir_metadata_all);
+   }
    return progress;
 }
